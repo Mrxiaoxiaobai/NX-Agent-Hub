@@ -25,7 +25,12 @@ python -m unittest discover -s tests -v
 
 通过判据：所有检查项 `OK`，退出码 0。检查项见 `scripts/validate_repo.py`：
 关键文件存在、技能四处副本 md5 一致、连接器模板 JSON 可解析且占位符齐全、
-`CAPABILITIES.md` 与技能版本号一致、README 文档链接指向真实文件、无令牌泄漏。
+`CAPABILITIES.md` 与技能版本号一致、README 文档链接指向真实文件、无令牌泄漏、
+CI 两份配置逐字节一致、运行副本与推送副本一致。
+
+> CI 配置同时保留 `.github/workflows/validate.yml` 与 `ci/validate.yml` 两份相同内容：
+> GitHub 对 workflow 路径的写入要求 PAT 具备 Workflows 权限，缺权限时
+> `sync_github.py` 只推 `ci/` 副本并打印 WARN（不算失败）。补权限后重跑即自动启用线上 CI。
 
 ## L1 — 桥自检（需要用户会话里开着 NX）
 

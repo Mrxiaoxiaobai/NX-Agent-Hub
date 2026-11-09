@@ -52,6 +52,10 @@ python sync_github.py <TOKEN> --check   # 列出待同步文件
 python sync_github.py <TOKEN>           # 推送到 Mrxiaoxiaobai/NX-Agent-Hub main
 ```
 
+脚本推送前会强制跑 L0 自检，内容未变的文件按 blob sha 跳过。
+**已知例外**：PAT 没有 Workflows 权限，`.github/workflows/validate.yml` 无法自动写入；
+等价内容已同步到 `ci/validate.yml`，脚本每次会再试一次，补权限后重跑即自动启用 CI，无需手改文件。
+
 本机 Git 走代理会报 CONNECT tunnel 502，因此**一律走 GitHub Contents API，不用 git push**。
 PAT 只在命令行传入，不落盘、不写进仓库文件。
 

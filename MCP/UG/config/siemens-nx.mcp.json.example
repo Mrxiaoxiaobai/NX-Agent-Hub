@@ -1,5 +1,5 @@
 {
-  "_comment": "WorkBuddy MCP connector template for the local Siemens NX bridge. Copy to ~/.workbuddy/mcp.json, replace <REPO> and <NXROOT> with absolute Windows paths, then Trust the 'siemens-nx' connector in WorkBuddy. See CAPABILITIES.md section 5.",
+  "_comment": "WorkBuddy MCP connector template for the local Siemens NX2007 bridge. Copy to ~/.workbuddy/mcp.json, replace <REPO> and <NXROOT> with absolute Windows paths, then Trust the 'siemens-nx' connector in WorkBuddy. Start NX with UGII_USER_DIR explicitly injected (the NX process reads its own environment). Post-change checks: CAPABILITIES.md section 5, docs/architecture.md, docs/validation.md L1. Never commit real absolute paths or tokens.",
   "mcpServers": {
     "siemens-nx": {
       "command": "<REPO>\\MCP\\UG\\.venv\\Scripts\\python.exe",

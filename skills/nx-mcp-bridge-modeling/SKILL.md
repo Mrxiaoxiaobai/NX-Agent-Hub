@@ -4,8 +4,8 @@ slug: nx-mcp-bridge-modeling
 displayName: "NX MCP 桥接建模（首选）"
 display_name: "NX MCP 桥接建模（首选）"
 display_name_en: "NX MCP Bridge Modeling"
-version: "3.1.0"
-summary: "用 MCP 桥实时驱动本机 NX2007 建模；融合上游 NX_MCP 方法论、586 行真机配方、2026-11-09 特征编辑定稿与最终连接器配置。过程可见＝看 NX 窗口，截图按需。"
+version: "3.2.0"
+summary: "用 MCP 桥实时驱动本机 NX2007 建模；融合上游 NX_MCP 方法论、586 行真机配方、2026-11-09 特征编辑定稿与最终连接器配置；v3.2.0 补齐上游契约落地与仓库工程规范。过程可见＝看 NX 窗口，截图按需。"
 description: |
   Drive a LIVE Siemens NX (UG) session in real time through the CAD-Agent-Hub MCP bridge
   (`siemens-nx` MCP server + in-NX .NET Remoting DLL), executing raw NXOpen Python via the
@@ -30,7 +30,7 @@ license: "MIT"
 agent_created: true
 metadata:
   category: cad-automation
-  version: "3.1.0"
+  version: "3.2.0"
   updated: "2026-11-09"
   upstream_reference: "Mrxiaoxiaobai/NX_MCP (fork of DreamEnding/NX_MCP)"
 ---
@@ -731,12 +731,18 @@ mcp__siemens-nx__ping                                   -> ok:true, transport=do
 | 1.4.1 | 2026-09-18 | 586 行真机配方库：椭球、视角、色板、能力矩阵、STEP 洗白、截图脚本 |
 | 2.0.0 | 2026-11-09 | 融合上游 NX_MCP 方法论；取消每步截图（用户明确要求） |
 | 3.0.0 | 2026-11-09 | **合并 1.4.1 全文 + 2.0.0 方法论 + 本轮特征编辑定稿 + 最终连接器配置；统一"移动实体不可用""默认不截图"等历史矛盾结论** |
+| 3.1.0 | 2026-11-09 | 二次优化：统一 Windows 路径、移除 §4.1/4.2 死代码、修正 §4.4 反向结论与能力矩阵孔行、新增 §19 三方对照与「绝不精简重写」纪律 |
+| **3.2.0** | **2026-11-09** | **参照上游 NX_MCP 补齐仓库工程规范**（CHANGELOG / AGENTS / CONTRIBUTING / SECURITY / docs 四篇 / 静态自检 + CI）；技能新增 §20 把上游「改前查询 → 对象引用 → 改后验证 → 失败恢复」契约映射到本机具体工具。**不改任何已真机验证的建模代码** |
 
-| **3.1.0** | **2026-11-09** | **二次优化**：统一 Windows 路径、移除 §4.1/4.2 死代码、修正 §4.4 反向结论与能力矩阵孔行、新增 §19 三方对照与「绝不精简重写」纪律 |
+同步目标：`Mrxiaoxiaobai/NX-Agent-Hub`（main，2026-11-09 由 `CAD-Agent-Hub` 改名）。
+同步入口：工作区 `sync_github.py`（GitHub Contents API，绕开本机 Git TLS 代理 502）。
+同步文件以 `sync_github.py::FILES` 为准：技能、`nx_ready.py`、连接器模板、
+`CAPABILITIES.md`、双 README、`CHANGELOG.md`、`AGENTS.md`、`CONTRIBUTING.md`、
+`SECURITY.md`、`docs/*.md`、`scripts/validate_repo.py`、`tests/test_repo_consistency.py`、
+`.github/workflows/validate.yml`。
 
-同步目标：`Mrxiaoxiaobai/CAD-Agent-Hub`（main）。同步文件：
-`skills/nx-mcp-bridge-modeling/SKILL.md`、`MCP/UG/workbuddy_scripts/nx_ready.py`、
-`MCP/UG/config/siemens-nx.mcp.json.example`、`CAPABILITIES.md`。
+改完必跑 `python scripts/validate_repo.py`（L0 全绿）→ `python sync_github.py <TOKEN>` 推送
+→ 逐文件回读比对。L0 只证明仓库自洽，**不能**替代 L1/L2 真机验收（见 `docs/validation.md`）。
 
 
 ---
@@ -760,4 +766,56 @@ mcp__siemens-nx__ping                                   -> ok:true, transport=do
 
 本机生效技能、`github_sync` 副本、`CAD-Agent-Hub` 副本、`github_publish` 副本四处保持 md5 一致；
 逐行保留率 91.1% 的原因：删除 35 行死代码 + 14 处结论修正改写了原文；**有效配方 100% 保留**。
-线上同步目标 `Mrxiaoxiaobai/CAD-Agent-Hub`（main，基线 `275ee61`）。
+线上同步目标 `Mrxiaoxiaobai/NX-Agent-Hub`（main；基线 `275ee61` → `d8647a38` → v3.2.0）。
+
+---
+
+## 20. v3.2.0：上游 `NX_MCP` 契约在本机的落地（2026-11-09）
+
+§17 记的是上游方法论原文；本节记**干活时具体怎么执行**。
+参照上游 `CLAUDE.md` / `docs/architecture.md` / `docs/real-nx-validation.md` 的工程化做法，
+仓库补齐了 `CHANGELOG.md`、`AGENTS.md`、`CONTRIBUTING.md`、`SECURITY.md`、
+`docs/architecture.md`、`docs/validation.md`、`docs/inspection-contract.md`、
+`docs/nx-mcp-comparison.md`，以及零依赖自检 `scripts/validate_repo.py` + CI。
+**这些全是规范与验收，不是新能力；82 个专用工具与 `run_python` 一行代码都没改。**
+
+### 20.1 四步契约 → 本机工具对照
+
+| 上游原则 | 本机落地（照做即可） |
+|---|---|
+| 改前查询、确认桥状态 | `python nx_ready.py --status` → `mcp__siemens-nx__ping` → `run_python` 查 `list(work.Bodies)` / `Features.GetFeatures()` / `AskBoundingBox` / 工作零件名 |
+| 用返回的对象引用，不猜名字 | 本绑定是真实 NXOpen 对象；**tag 会重编号**，跨脚本用 `body.SetName()` 按名字找；`edge_indices` 只用**当次**枚举结果，别缓存 |
+| 改后验证做实 | 每次布尔 / 倒角 / 开孔 / 新建体后立刻回查体数、特征类型计数、面/边数、bbox。布尔 Unite 判据 = 体数确实 -1；`ok:true` 不算证据 |
+| 失败恢复、不重放 | 本机**没有** undo mark / `execution_state` / `NX_ROLLBACK_FAILED`；超时或断连先重新查询模型再决定，绝不原样重发 mutation；失败就删除重建或改走专用工具；出错不循环重试 |
+| 保存边界 | `work.Save(SaveComponents.TrueValue, CloseAfterSave.FalseValue)`（两参数），只针对 work part，不覆盖无关零件 |
+
+### 20.2 证据分级（别把「没报错」当「做对了」）
+
+```
+文档 / NXOpen.xml 有该 API       → 只证明文档存在（已多次证伪）
+L0 静态自检 / CI 全绿           → 只证明仓库自洽
+L1 ping ok / server.py 可导入   → 只证明链路连通
+L2 改后回查数值符合预期         → 唯一算数的建模证据
+工具返回 ok:true                → 什么几何都没证明
+```
+
+分层验收命令与逐项判据见 `docs/validation.md`；可靠/不可靠的查询手段见
+`docs/inspection-contract.md`；链路与恢复契约见 `docs/architecture.md`；
+两库为何不能互换见 `docs/nx-mcp-comparison.md`。
+
+### 20.3 改完仓库必须走的三步
+
+```
+python scripts/validate_repo.py          # L0：文件齐全 / 四处副本 md5 / 版本号 / 模板 / 链接 / 无令牌
+python sync_github.py <TOKEN> --check   # 列出待同步文件
+python sync_github.py <TOKEN>           # 推到 NX-Agent-Hub main，再逐文件回读比对
+```
+
+`NX_AGENT_HUB_WORKSPACE` 环境变量可让自检额外核对本机四处技能副本与运行副本
+`CAD-Agent-Hub`；CI 上不设置 → 该项 SKIP（不误报失败）。
+
+### 20.4 纪律不变
+
+技能**只能增补 + 修正，绝不精简重写**；四处副本 md5 一致；
+本机生效 / 本地副本 / GitHub 线上三方一致；**默认不截图**；用户只发一句话、只看 NX 结果。
+`CAPABILITIES.md` §3/§4 的 ✅/❌ 结论没有新的 L2 证据不要翻转。

@@ -19,8 +19,12 @@
 - `docs/inspection-contract.md`：查询契约，区分可靠查询手段与已实测不可靠手段。
 - `docs/nx-mcp-comparison.md`：两个 NX 仓库的定位对照、借鉴边界与不可互换的原因。
 - `scripts/validate_repo.py`：零依赖静态一致性自检；`tests/test_repo_consistency.py` 的 unittest 包装。
-- `.github/workflows/validate.yml`：无需 Siemens NX 的托管 CI，只跑静态自检。
+- `.github/workflows/validate.yml` + `ci/validate.yml`（逐字节一致的两份）：无需 Siemens NX 的托管 CI，只跑静态自检。
+  GitHub 对 `.github/workflows/*` 的写入要求 PAT 额外具备 Workflows 权限，当前令牌没有；
+  `sync_github.py` 会自动尝试该路径、缺权限时降级为只同步 `ci/validate.yml` 并打印 WARN，不阻断同步。
 - 技能新增 §20：把上游「改前查询 → 对象引用 → 改后验证 → 失败恢复」契约映射到本机具体工具。
+- 同步脚本支持 `NX_AGENT_HUB_WORKSPACE` 覆盖工作区、按 git blob sha 跳过内容未变的文件、
+  推送前强制跑 L0 自检，并把自身放进仓库以便线上复现。
 
 ### Changed
 

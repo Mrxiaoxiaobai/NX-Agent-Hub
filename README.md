@@ -25,3 +25,8 @@ This repository intentionally contains source code, tests, schemas, portable con
 ## Validation
 
 Run each MCP project's documented unit tests before using it with a live CAD session. A successful COM/API call is not by itself proof that a model, mesh, drawing, or simulation result is correct; inspect the native application state and generated artifacts.
+
+## NX 建模能力清单（2026-11-09 核验）
+
+本机 NX2007 + MCP 桥的真实可用/不可用能力、连接器配置模板与交付约定，见 **[CAPABILITIES.md](CAPABILITIES.md)**；
+完整真机配方与建模技能见 `skills/nx-mcp-bridge-modeling/SKILL.md`（v3.1.0）。

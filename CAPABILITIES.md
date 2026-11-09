@@ -102,7 +102,7 @@ WorkBuddy 连接器 siemens-nx
 | `docs/validation.md` | L0 / L1 / L2 分层验收与证据分级 |
 | `docs/inspection-contract.md` | 查询契约：可靠手段、已实测不可靠手段、明确不做的提案 |
 | `docs/nx-mcp-comparison.md` | 与上游 `NX_MCP` 的定位对照、借鉴边界与不可互换原因 |
-| `scripts/validate_repo.py` + `tests/` + `.github/workflows/validate.yml` | 零依赖静态自检、unittest 包装与无需 NX 的 CI |
+| `scripts/validate_repo.py` + `tests/` + `.github/workflows/validate.yml` + `ci/validate.yml` | 零依赖静态自检、unittest 包装与无需 NX 的 CI（两份 CI 逐字节一致） |
 
 上游参考：`Mrxiaoxiaobai/NX_MCP`（fork of `DreamEnding/NX_MCP`）—— 官方建模方法论来源；
 本机部署是面向 NX2007 适配的工作副本，**不要**用上游 C# GUI 桥替换本机 `NXMcPRemotingServer.dll`。
@@ -131,7 +131,7 @@ WorkBuddy 连接器 siemens-nx
 | `docs/architecture.md`（对象生命周期 / 恢复契约） | 同名文档，改写为本机链路与「无 undo mark」的恢复方式 |
 | `docs/inspection-contract.md` | 同名文档，改为「已验证查询契约 + 已知不可靠项 + 明确不做的提案」 |
 | `docs/real-nx-validation.md`（证据分级） | `docs/validation.md`：**文档声明 ≠ CI 通过 ≠ 工具 ok ≠ 真机正确** |
-| `tests/` + `ci.yml` | `scripts/validate_repo.py` + `tests/` + 零 NX 依赖的 `validate.yml` |
+| `tests/` + `ci.yml` | `scripts/validate_repo.py` + `tests/` + 零 NX 依赖的 `validate.yml`（另存 `ci/` 等价副本） |
 
 新增静态自检（L0，可在任何机器跑，不需要 NX）：
 
@@ -139,6 +139,10 @@ WorkBuddy 连接器 siemens-nx
 python scripts/validate_repo.py            # 关键文件 / 四处技能副本 md5 / 版本号 / 模板 / 链接 / 无令牌
 python -m unittest discover -s tests -v   # 同一套检查的 unittest 包装
 ```
+
+**已知同步例外**：GitHub 对 `.github/workflows/*` 要求 PAT 额外具备 Workflows 权限，
+当前令牌没有 → 该路径写不进去；等价的 `ci/validate.yml` 已同步，
+`sync_github.py` 每次推送都会再试一次并打印 WARN（不算失败），补权限后重跑即自动启用线上 CI。
 
 L1（桥连通）与 L2（真机建模）**只能在这台 NX2007 机器上跑**，CI 故意不跑。
 技能新增 §20，把上游「改前查询 → 对象引用 → 改后验证 → 失败恢复」四步契约

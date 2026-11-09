@@ -25,3 +25,8 @@ English documentation: [README.md](README.md)
 ## 验证原则
 
 连接真实 CAD 会话前，请先执行各 MCP 项目文档中的单元测试。COM/API 调用成功不等于模型、网格、工程图或仿真结果正确，仍需在原生软件中检查模型树、参数和生成产物。
+
+## NX 建模能力清单（2026-11-09 核验）
+
+本机 NX2007 + MCP 桥的真实可用/不可用能力、连接器配置模板与交付约定，见 **[CAPABILITIES.md](CAPABILITIES.md)**；
+完整真机配方与建模技能见 `skills/nx-mcp-bridge-modeling/SKILL.md`（v3.1.0）。

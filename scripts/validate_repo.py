@@ -35,8 +35,10 @@ REQUIRED = [
     "docs/inspection-contract.md",
     "docs/nx-mcp-comparison.md",
     "scripts/validate_repo.py",
+    "scripts/sync_github.py",
     "tests/test_repo_consistency.py",
     ".github/workflows/validate.yml",
+    "ci/validate.yml",
     "skills/nx-mcp-bridge-modeling/SKILL.md",
     "MCP/UG/config/siemens-nx.mcp.json.example",
     "MCP/UG/workbuddy_scripts/nx_ready.py",
@@ -199,12 +201,24 @@ def check_run_copy():
                   "不一致: " + ", ".join(diff[:6]) if diff else "运行副本与推送副本逐字节一致")
 
 
+def check_ci_copies():
+    """workflow 路径需要额外 GitHub 权限，因此同时维护一份可直接写入的 ci/ 副本。"""
+    a = ROOT / ".github/workflows/validate.yml"
+    b = ROOT / "ci/validate.yml"
+    if not a.is_file() or not b.is_file():
+        return result("CI 配置双份一致", False, "缺 workflow 或 ci/ 副本")
+    ok = a.read_bytes() == b.read_bytes()
+    return result("CI 配置双份一致", ok,
+                  "两份逐字节一致" if ok else "ci/validate.yml 需与 workflow 同步")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
     rows = [check_required(), check_versions(), check_connector_template(),
-            check_links(), check_no_tokens(), check_local_copies(), check_run_copy()]
+            check_links(), check_no_tokens(), check_local_copies(), check_run_copy(),
+            check_ci_copies()]
     for status, name, detail in rows:
         if args.quiet and status != "FAIL":
             continue

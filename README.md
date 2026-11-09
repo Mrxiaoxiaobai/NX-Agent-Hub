@@ -24,9 +24,46 @@ This repository intentionally contains source code, tests, schemas, portable con
 
 ## Validation
 
-Run each MCP project's documented unit tests before using it with a live CAD session. A successful COM/API call is not by itself proof that a model, mesh, drawing, or simulation result is correct; inspect the native application state and generated artifacts.
+Run each MCP project's documented unit tests before using it with a live CAD session. A successful COM/API call is not by itself proof that a model, mesh, drawing, or simulation result is correct; inspect the native application state and generated artifacts. For the NX path, see the [layered acceptance checklist](docs/validation.md).
 
-## NX 建模能力清单（2026-11-09 核验）
+## NX capabilities and validation (v3.2.0, verified 2026-11-09)
 
-本机 NX2007 + MCP 桥的真实可用/不可用能力、连接器配置模板与交付约定，见 **[CAPABILITIES.md](CAPABILITIES.md)**；
-完整真机配方与建模技能见 `skills/nx-mcp-bridge-modeling/SKILL.md`（v3.1.0）。
+This repository is the **daily working path** for a local Siemens NX2007 session.
+`Mrxiaoxiaobai/NX_MCP` (fork of `DreamEnding/NX_MCP`) is the **methodology reference**;
+its NX2506 Python batch / NX2206 C# GUI bridge is **not** interchangeable with this
+`.NET Remoting` bridge. See the [comparison](docs/nx-mcp-comparison.md).
+
+| Area | Claim | Evidence |
+| --- | --- | --- |
+| Bridge chain (`ping` → Remoting `:48161` → in-process NXOpen) | ✅ Real NX2007 | [Capabilities](CAPABILITIES.md) §1, skill §16 |
+| Modeling: block / arc-based cylinders / exact ellipsoids / assemblies / view / colors / save | ✅ Real-machine recipes | [Skill](skills/nx-mcp-bridge-modeling/SKILL.md) §3–§8 |
+| Feature editing: chamfer / fillet / cylindrical hole | ✅ Dedicated tools only | [Capabilities](CAPABILITIES.md) §3.2, skill §15 |
+| Body move/rotate, in-script blend builder, face-normal top detection | ❌ Verified **unusable** on this binding | [Capabilities](CAPABILITIES.md) §4 |
+| Upstream typed `nx_*` tools and `nx_measure_*` proposals | ➖ Not provided | [Comparison](docs/nx-mcp-comparison.md) |
+| L0 static self-check (files / copies / versions / template / links / tokens) | ✅ No NX required | `scripts/validate_repo.py`, CI |
+| L1 bridge check and L2 real-model acceptance | ⚠️ Local NX2007 only, deliberately excluded from CI | [Validation](docs/validation.md) |
+
+**Default availability, static checks and real-NX acceptance are separate claims.**
+A tool returning `ok:true`, a green CI run, or an API existing in `NXOpen.xml` does **not**
+certify native CAD behavior. Only the post-change query (body count, feature count,
+bounding box) counts as modeling evidence. See the [inspection contract](docs/inspection-contract.md).
+
+```
+python scripts/validate_repo.py            # L0, zero third-party dependencies
+python -m unittest discover -s tests -v   # same checks via unittest
+```
+
+## Documentation
+
+| Guide | What it covers |
+| --- | --- |
+| [Capabilities](CAPABILITIES.md) | Authoritative verified / unusable capability matrix |
+| [NX modeling skill](skills/nx-mcp-bridge-modeling/SKILL.md) | 820+ lines of real-machine NXOpen recipes (v3.2.0) |
+| [Architecture](docs/architecture.md) | Process boundaries, object lifecycle, recovery contract |
+| [Validation](docs/validation.md) | L0 / L1 / L2 acceptance and evidence boundaries |
+| [Inspection contract](docs/inspection-contract.md) | Reliable queries, known-unreliable queries, rejected proposals |
+| [NX_MCP comparison](docs/nx-mcp-comparison.md) | What was borrowed from upstream and what was not |
+| [Agent conventions](AGENTS.md) | Rules for AI agents and maintainers |
+| [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) | Version history, change discipline, trust boundary |
+
+The [Chinese README](README.zh-CN.md) mirrors this page.

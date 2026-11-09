@@ -813,6 +813,12 @@ python sync_github.py <TOKEN>           # 推到 NX-Agent-Hub main，再逐文�
 
 `NX_AGENT_HUB_WORKSPACE` 环境变量可让自检额外核对本机四处技能副本与运行副本
 `CAD-Agent-Hub`；CI 上不设置 → 该项 SKIP（不误报失败）。
+脚本推送前强制跑 L0、按 git blob sha 跳过内容未变的文件（不做无谓提交）。
+
+⚠️ **已知同步例外**：GitHub 对 `.github/workflows/*` 要求 PAT 额外具备 Workflows 权限，
+当前令牌没有 → 该路径写不进去（Contents API 返回 404 混淆响应，Git Data API 建 tree 同样被拒）。
+等价内容已推到 `ci/validate.yml`，两份逐字节一致；`sync_github.py` 每次推送都会自动重试一次并
+打印 WARN（不算失败、不阻断同步）。补权限后重跑脚本即自动启用线上 CI，无需手改任何文件。
 
 ### 20.4 纪律不变
 

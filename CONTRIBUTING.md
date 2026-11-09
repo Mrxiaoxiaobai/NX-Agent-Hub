@@ -32,6 +32,7 @@
 - [ ] 本机生效技能 `~/.workbuddy/skills/nx-mcp-bridge-modeling/SKILL.md` 已更新
 - [ ] 四处技能副本 md5 一致（生效副本 + `CAD-Agent-Hub` + `github_publish` + `github_sync`）
 - [ ] `github_sync/`（推送副本）与 `CAD-Agent-Hub/`（运行副本）内容一致
+- [ ] `.github/workflows/validate.yml` 与 `ci/validate.yml` 逐字节一致（L0 会检查）
 - [ ] `python scripts/validate_repo.py` 全绿
 - [ ] `python sync_github.py <TOKEN>` 推送成功，并逐文件回读比对
 - [ ] `CHANGELOG.md` 记一笔，`CAPABILITIES.md` 的版本号同步

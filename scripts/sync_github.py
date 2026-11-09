@@ -16,6 +16,9 @@ PAT 需要 classic PAT 的 `repo` 权限（或 fine-grained PAT 对该仓库的 
 （GitHub App 未获该仓库 contents:write 授权）。补授权后 `--connector` 即可直接用。
 
 v3.2.0：同步清单扩展到工程规范文档、静态自检脚本与 CI（见 FILES）。
+内容未变的文件会按 git blob sha 自动跳过，避免无谓提交。
+CI 工作流 `.github/workflows/validate.yml` 需要额外的 Workflows 权限；缺权限时
+自动降级为只同步等价的 `ci/validate.yml` 并打印 WARN，不阻断同步（见 OPTIONAL_WORKFLOWS）。
 推送前后建议跑 `python scripts/validate_repo.py`（L0 全绿）并逐文件回读比对。
 工作区定位：环境变量 `NX_AGENT_HUB_WORKSPACE` 优先，否则从脚本所在位置自动推断；
 不写死本机绝对路径，因此这份脚本可直接放进仓库。
@@ -74,9 +77,17 @@ FILES = [
     "scripts/validate_repo.py",
     "scripts/sync_github.py",
     "tests/test_repo_consistency.py",
-    ".github/workflows/validate.yml",
+    "ci/validate.yml",
 ]
-MSG = "feat: align with NX_MCP engineering practices (v3.2.0 docs, validation, static checks, CI)"
+# GitHub 对 .github/workflows/* 的写入要求 classic PAT 的 `workflow` scope，
+# 或 fine-grained PAT 的「Workflows: write」。当前令牌没有该权限：Contents API
+# 返回 404 混淆响应，Git Data API 建 tree 同样被拒。因此 workflow 作为**可选增强**
+# 单独尝试：成功则线上 CI 自动生效；不成功则 ci/validate.yml 已保证内容同步，
+# 不阻断整个同步流程（也不再把「内容一致」误报为失败）。
+OPTIONAL_WORKFLOWS = [
+    (".github/workflows/validate.yml", "ci/validate.yml"),
+]
+MSG = "feat: align with NX_MCP engineering practices (v3.2.0 docs, validation, static checks, CI template)"
 
 
 def request(token, method, url, data=None):
@@ -106,6 +117,15 @@ def read_files():
     return out
 
 
+def blob_sha(raw):
+    """计算本地内容的 git blob sha，用于跳过内容未变的文件、避免无谓提交。"""
+    import hashlib
+    h = hashlib.sha1()
+    h.update(b"blob %d\0" % len(raw))
+    h.update(raw)
+    return h.hexdigest()
+
+
 def sync_via_pat(token, check_only=False):
     code, info = request(token, "GET", "https://api.github.com/user")
     if code != 200:
@@ -123,6 +143,7 @@ def sync_via_pat(token, check_only=False):
 
     failed = []
     for rel, content in items:
+        raw = content.encode("utf-8")
         api_path = "https://api.github.com/repos/%s/%s/contents/%s" % (OWNER, REPO, rel)
         code, cur = request(token, "GET", api_path + "?ref=" + BRANCH)
         sha = cur.get("sha") if code == 200 else None
@@ -130,9 +151,12 @@ def sync_via_pat(token, check_only=False):
             print("  FAIL %-52s GET HTTP %s %s" % (rel, code, cur.get("message")))
             failed.append(rel)
             continue
+        if sha == blob_sha(raw):
+            print("  SAME %-52s 内容未变，跳过" % rel)
+            continue
         data = {
             "message": MSG,
-            "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+            "content": base64.b64encode(raw).decode("ascii"),
             "branch": BRANCH,
         }
         if sha:
@@ -144,6 +168,33 @@ def sync_via_pat(token, check_only=False):
         else:
             print("  FAIL %-52s PUT HTTP %s %s" % (rel, code, res.get("message")))
             failed.append(rel)
+
+    # 可选增强：把同一份 CI 配置写进 .github/workflows/ 让 GitHub Actions 真正跑起来。
+    # 缺 Workflows 权限时不算同步失败，ci/validate.yml 已保证内容一致。
+    for target, source in OPTIONAL_WORKFLOWS:
+        src = os.path.join(PAYLOAD, source.replace("/", os.sep))
+        if not os.path.isfile(src):
+            continue
+        raw = io.open(src, "rb").read()
+        api_path = "https://api.github.com/repos/%s/%s/contents/%s" % (OWNER, REPO, target)
+        code, cur = request(token, "GET", api_path + "?ref=" + BRANCH)
+        sha = cur.get("sha") if code == 200 else None
+        if sha == blob_sha(raw):
+            print("  SAME %-52s CI 已启用" % target)
+            continue
+        data = {"message": MSG, "content": base64.b64encode(raw).decode("ascii"),
+                "branch": BRANCH}
+        if sha:
+            data["sha"] = sha
+        code, res = request(token, "PUT", api_path, data)
+        if code in (200, 201):
+            print("  OK   %-52s CI 已启用" % target)
+        elif code in (403, 404):
+            print("  WARN %-52s 令牌缺 Workflows 权限，CI 未自动启用" % target)
+            print("       内容已同步到 %s；在 GitHub 网页端把该文件复制到 %s 即可启用，" % (source, target))
+            print("       或给 PAT 补 Workflows 权限后重跑本脚本（会自动补上，无需手动改文件）。")
+        else:
+            print("  WARN %-52s PUT HTTP %s %s" % (target, code, res.get("message")))
     print("=" * 60)
     if failed:
         print("同步未完成，失败 %d 个: %s" % (len(failed), ", ".join(failed)))

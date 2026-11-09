@@ -1,0 +1,29 @@
+{
+  "_comment": "WorkBuddy MCP connector template for the local Siemens NX bridge. Copy to ~/.workbuddy/mcp.json, replace <REPO> and <NXROOT> with absolute Windows paths, then Trust the 'siemens-nx' connector in WorkBuddy. See CAPABILITIES.md section 5.",
+  "mcpServers": {
+    "siemens-nx": {
+      "command": "<REPO>\\MCP\\UG\\.venv\\Scripts\\python.exe",
+      "args": [
+        "<REPO>\\MCP\\UG\\server.py"
+      ],
+      "cwd": "<REPO>\\MCP\\UG",
+      "env": {
+        "UGII_BASE_DIR": "<NXROOT>",
+        "UGII_USER_DIR": "<REPO>\\MCP\\UG\\nx_user",
+        "NX_MCP_TRANSPORT": "remoting",
+        "NX_MCP_HOST": "127.0.0.1",
+        "NX_MCP_PORT": "48160",
+        "NX_MCP_REMOTING_PORT": "48161",
+        "NX_MCP_TIMEOUT": "120",
+        "NX_MCP_ALLOW_EXECUTE": "1",
+        "NX_MCP_WORKSPACE": "D:\\三维建模结果",
+        "NX_MCP_CLIENT_EXE": "<REPO>\\MCP\\UG\\dotnet_bridge\\bin\\NXRemoteClient.exe",
+        "NX_MCP_REMOTE_OPS": "<REPO>\\MCP\\UG\\nx_remote_ops.py",
+        "NX_MCP_NXOPEN_DLL": "<NXROOT>\\NXBIN\\managed\\NXOpen.dll",
+        "PYTHONPATH": "<REPO>\\MCP\\UG",
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}

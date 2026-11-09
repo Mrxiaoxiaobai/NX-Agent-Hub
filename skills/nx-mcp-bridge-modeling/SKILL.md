@@ -1,5 +1,11 @@
 ---
 name: nx-mcp-bridge-modeling
+slug: nx-mcp-bridge-modeling
+displayName: "NX MCP 桥接建模（首选）"
+display_name: "NX MCP 桥接建模（首选）"
+display_name_en: "NX MCP Bridge Modeling"
+version: "3.1.0"
+summary: "用 MCP 桥实时驱动本机 NX2007 建模；融合上游 NX_MCP 方法论、586 行真机配方、2026-11-09 特征编辑定稿与最终连接器配置。过程可见＝看 NX 窗口，截图按需。"
 description: |
   Drive a LIVE Siemens NX (UG) session in real time through the CAD-Agent-Hub MCP bridge
   (`siemens-nx` MCP server + in-NX .NET Remoting DLL), executing raw NXOpen Python via the
@@ -11,17 +17,22 @@ description: |
   the exact NX2007 binding quirks, bounding-box + color + delete APIs,
   the SaveAs name-collision trap, the **unstable body-tag trap**, the STEP round-trip
   part-cleaning trick, the reliable screenshot-verification script,
-  and **body translation via MoveObjectBuilder/MoveBodyBuilder** (2026-09-18: the old
-  "move/rotate all dead" claim was a testing error — translation works).
+  and the FINAL verdict that body translation/rotation is NOT usable on this NX2007 binding
+  (2026-09-18 real-machine verified: build in target pose, or delete-and-rebuild).
+  Also covers dedicated-tool chamfer/fillet/hole (2026-11-09), topology-by-vertex
+  face identification, and the exact WorkBuddy MCP connector config.
   NOTE: this is a DIFFERENT mechanism from `nx-journal-automation` (that one = offline
   run_journal.exe journals). **THIS is the PRIMARY/首选 NX modeling path** — use it whenever
   the interactive MCP bridge is in play; `nx-journal-automation` is only the fallback.
-description_zh: "用 MCP 桥实时驱动运行中的 NX（run_python + NXOpen）—— NX 建模首选方案"
+description_zh: "用 MCP 桥实时驱动运行中的 NX（run_python + 专用工具）—— NX 建模首选方案"
 description_en: "Drive a live NX session via the CAD-Agent-Hub MCP bridge (primary NX path)"
+license: "MIT"
 agent_created: true
 metadata:
   category: cad-automation
-  version: "1.4.1"
+  version: "3.1.0"
+  updated: "2026-11-09"
+  upstream_reference: "Mrxiaoxiaobai/NX_MCP (fork of DreamEnding/NX_MCP)"
 ---
 
 # 用 MCP 桥实时驱动运行中的 NX（NXOpen via run_python）
@@ -44,7 +55,10 @@ python "E:\workbuddy-成果\2026-09-15-12-10-47\nx_ready.py" --status
 
 - 输出 `RESULT: READY` → NX 已开、桥在线，**直接开始建模**。
 - 输出 `RESULT: NOT_READY` → 去掉 `--status` 再跑一次，脚本会**自动打开 NX** 并
-  轮询到桥上线（最长 180 秒），拿到 `RESULT: READY` 再建模。全程无需用户操作。
+  轮询到桥上线（最长 180 秒），拿到 `RESULT: READY` 再建模。
+  ⚠️ **运营现实（见 §14.2）**：由 AI 沙箱/工具调用拉起的 NX 会在该次调用结束时被回收，
+  桥随之中断。**稳定可用的唯一前提**是用户在本机桌面双击 `nx_start.bat` 开着 NX；
+  用户开着时 `nx_ready.py --status` 应直接返回 `READY`。
 - 输出 `RESULT: NX_RUNNING_NO_BRIDGE` → NX 开着但桥没加载。改用离线兜底
   （`nx-journal-automation`）或提示用户重启一次 NX；**不要**再开第二个 NX。
 - 输出 `RESULT: FAILED` → 桥没等到，同样走兜底，并把情况如实告诉用户。
@@ -168,47 +182,24 @@ arc = work.Curves.CreateArc(
   再统一布尔相加，就得到有立体感又不失轮廓的 3D 物。小鹏 P7 之后那只卡通小狗（见 §7 案例）
   15 个圆/矩形 → 1 个实体，就是这么做的。
 
-## 4. 移动实体（平移）—— MoveObjectBuilder / MoveBodyBuilder（2026-09-18 文档核查更正）
+## 4. 移动 / 旋转实体 —— 结论：本绑定一律不可用（2026-11-09 定稿）
 
-> ⚠️ **重大更正**：旧版本节的"三条旋转/移动路全废"是**2026-09-17 测错了**。
-> 2026-09-18 用 NX 自带 `NXOpen.xml` 静态核查 + 真机探针确认：
-> **`CreateMoveObjectBuilder`、`CreateMoveBodyBuilder` 都存在且可用**，是平移实体的标准手段。
-> 旧结论作废，本节重写。
+> ✅ **最终定稿（2026-09-18 真机，2026-11-09 复核）**：本节下面所有
+> `MoveObjectBuilder` / `MoveBodyBuilder` 代码**一律不可用**。
+> `CreateMoveObjectBuilder` 实机工厂不存在（AttributeError）、
+> `MoveBodyBuilder.BodyToMove` 实机赋值报 not writable、
+> `UF TransformEntities` 对 body 是 no-op。文档里有 ≠ 实机能用。
+> **要挪实体 → 删除重建，或一开始建在目标位姿（§4.3）。**
+> 曾有一版据 `NXOpen.xml` 静态核查误判"可用"，已推翻；下面代码块仅作档案。
 
-### 4.1 ⚠️ 平移一个实体 —— 实机不可用（2026-09-18 真机翻案）
-**真机实测（NX2007 活会话）**：`work.Features.CreateMoveObjectBuilder` **不存在**
-（AttributeError: FeatureCollection object has no attribute 'CreateMoveObjectBuilder'）。
-文档里有、实机没有。下面的代码留作档案，**别用**；要挪实体 → 删除重建，或一开始就建在目标位姿。
+### 4.1 / 4.2 移动实体 API —— 死代码已移除（v3.1.0 优化）
 
-```python
-def move_body(body, dx, dy, dz, copy=False):
-    mb = work.Features.CreateMoveObjectBuilder(NXOpen.Features.MoveObject.Null)
-    mb.ObjectToMoveObject.Add(body)                       # 要移动的体（SelectObjectList.Add）
-    mb.MoveObjectResult = (NXOpen.Features.MoveObjectBuilder
-                           .MoveObjectResultOptions.CopyOriginal if copy
-                           else NXOpen.Features.MoveObjectBuilder
-                           .MoveObjectResultOptions.MoveOriginal)
-    mb.Associative = False
-    tm = mb.TransformMotion
-    tm.DeltaXc.RightHandSide = str(float(dx))
-    tm.DeltaYc.RightHandSide = str(float(dy))
-    tm.DeltaZc.RightHandSide = str(float(dz))
-    f = mb.CommitFeature(); mb.Destroy()
-    return f
-```
-- `ObjectToMoveObject` 若 `.Add` 报错，改 `.AddMultiple([body])`。
-- 平移后按 §5 包围盒核对是否真动了（`|ΔminX| ≈ dx`）。
+> ❌ **不要再尝试**：`CreateMoveObjectBuilder`（实机工厂不存在）、
+> `MoveBodyBuilder.BodyToMove`（实机 not writable）、`UF TransformEntities`（对 body no-op）。
+> 2026-09 曾误留两段示例代码并标注「可用」，属静态文档核查误判；真机复核后已在 v3.1.0 删除，
+> 避免后续会话照抄踩坑。历史代码可从仓库 `275ee61` 版本的本技能查阅。
 
-### 4.2 ⚠️ 备选：MoveBodyBuilder —— 实机同样不可用
-`mbb.BodyToMove = body` → 实机报 **not writable**（2026-09-18 真机确认）。
-```python
-mbb = work.Features.CreateMoveBodyBuilder(NXOpen.Features.MoveBody.Null)
-mbb.BodyToMove = body          # 实测可设（旧记"只读"是错的）
-mo = mbb.Motion
-mo.DeltaXc.RightHandSide = str(dx); mo.DeltaYc.RightHandSide = str(dy)
-mo.DeltaZc.RightHandSide = str(dz)
-f = mbb.CommitFeature(); mbb.Destroy()
-```
+**唯一可靠做法 → §4.3**：删除重建，或一开始就建在目标位姿；详见 §15 定稿。
 
 ### 4.3 旋转/平移整体系 —— 一律「建成目标姿态」或删除重建（唯一可靠路）
 **结论（2026-09-18 真机定稿）：本绑定移动/旋转实体全部不可用**（4.1 工厂缺失、4.2 只读、
@@ -224,10 +215,11 @@ UF TransformEntities 对 body no-op）。需要改位姿的件：删掉按新位
   绕 +Y 旋转 θ：`(Δx,Δz) → rot2((Δx,Δz), -θ)`（等价 `x'=x·cosθ+z·sinθ, z'=-x·sinθ+z·cosθ`）。
 - 验证姿态：用 §5 包围盒确认端点在预期一侧（例如左门 maxY 明显 > 车侧 Y）。
 
-### 4.4 旧"三条路全废"记录（仅供复盘，勿据此实施）
-- 旧记"`CreateMoveObjectBuilder` 方法不存在" → **错**，文档+探针均确认存在。
-- 旧记"`CreateMoveBodyBuilder.BodyToMove` 只读" → **错**，实测可设。
-- `ufs.Modl.TransformEntities(...)` 对 body 仍是 no-op（这条是真的）。
+### 4.4 历史误判复盘（2026-11-09 已彻底推翻，勿据此实施）
+- 曾据 `NXOpen.xml` 静态核查判定「`CreateMoveObjectBuilder` 存在且可用」 → **真机为不存在**（AttributeError）。
+- 曾判定「`BodyToMove` 只读是误记、实测可设」 → **真机确为 not writable**。
+- `ufs.Modl.TransformEntities(...)` 对 body 是 no-op（这条始终为真）。
+- **最终结论以 §4.3 / §15 为准：本绑定移动 / 旋转实体全部不可用。文档里有 ≠ 实机能用。**
 
 ### 4.5 ⭐ 视角配方（2026-09-18 实测定稿）
 `vw.Rotate(origin, (0,0,1), θ)` 是**绕竖轴的转台 yaw**（θ 累加）。目标图同款轴测视角：
@@ -353,7 +345,8 @@ python nx_shot.py <out.png>             # 置前 + 截屏
 ## 6. 交付纪律（本用户偏好）
 - **用户只发一句话，其余全自动**；不要给选择题、不要让他自己开软件。
 - 用 **✅ 清单**汇报：建了什么、几个体、关键尺寸、存盘路径；**不复述 API/术语**。
-- 交付时附一张 NX 截屏（§5c），用户"只看结果"。
+- **默认不截图**（用户 2026-11-09 明确取消每步截图流程）；过程可见＝用户直接看 NX 窗口实时生长。
+  只有用户明确说"发我看看/截个图"，或需要自证造型时，才按 §5c/§11 截一张。
 - 用户重视"最大长度/宽度"等硬指标，建完用包围盒核对并**报出实测值**。
 
 ## 7. 成品案例（可照抄的比例与做法）
@@ -473,12 +466,16 @@ def unite_verified(target, tool, nm):
 3. `import_exchange(file_name="x.step", format="auto", include_curves=False, sew_surfaces=True, simplify_geometry=True)`
    → 返回 `body_count_added / update_error_count`，可直接核对。
 
-输出文件都落在 `CAD-Agent-Hub\MCP\UG\workspace\`。
+输出文件落在 `NX_MCP_WORKSPACE`（本机已固定为 `D:\三维建模结果`，由 `nx_ready.py`
+启动 NX 时注入；目录不存在时自动创建）。
 **注意**：STEP 只带几何，**颜色要重新设**；导入后实体常**处于选中高亮态（橙红色）**，
 按一次 Esc 即恢复本色——别以为颜色设错了。
 （更省事的做法：**一开始就在 `create_part` 出来的新零件里建**，根本不用洗。）
 
 ## 11. 截屏核对的升级版（工具：工作区 `nx_shot3.py`）
+
+> ⚠️ **不是默认动作**：用户 2026-11-09 已取消"每步截图"流程。本节仅在用户明确要看图、
+> 或建模完成需交付核对时启用。日常建模只让用户盯 NX 窗口。
 
 `nx_shot.py` 的坑：别的窗口（资源管理器、自己写的系统窗口）挡在 NX 前面 → 截出来是别人的窗。
 `nx_shot3.py` 的做法（已验证稳定）：
@@ -544,7 +541,7 @@ chrome/edge/firefox 一律跳过）+ 优先 `title.startswith("NX")`（真 NX �
 | 镜像体 | `CreateMirrorBodyBuilder` | 🟡 | 文档存在 |
 | 镜像特征 | `CreateMirrorFeatureBuilder` | 🟡 | |
 | 移动（平移） | `CreateMoveObjectBuilder` | ❌ | §4.1 实机工厂缺失 |
-| 移动体 | `CreateMoveBodyBuilder` | ✅ | §4.2 更正 |
+| 移动体 | `CreateMoveBodyBuilder` | ❌ | §4.2 实机 `BodyToMove` 只读 |
 | 移动面 | `CreateMoveFaceBuilder` | 🟡 | 含 `Types.RotateAboutAxis` |
 | 分割体 | `CreateSplitBodyBuilder` | 🟡 | |
 | 修剪体 | `CreateTrimBodyBuilder` | 🟡 | |
@@ -552,9 +549,9 @@ chrome/edge/firefox 一律跳过）+ 优先 `title.startswith("NX")`（真 NX �
 | 加厚 | `CreateThickenBuilder` | 🟡 | 面→体 |
 | 拔模 | `CreateDraftBodyBuilder` | 🟡 | |
 | 偏置面 | `CreateOffsetFaceBuilder` | 🟡 | |
-| 倒圆 | `CreateEdgeBlendBuilder` | 🟡 | |
-| 倒角 | `CreateChamferBuilder` | 🟡 | |
-| 孔 | `CreateHoleFeatureBuilder` / `CreateHolePackageBuilder` | ✅ | journal 技能 §5.2 |
+| 倒圆 | `CreateEdgeBlendBuilder` | ❌ | 2026-11-09：`AddChainset` 缺 `EdgeMultipleSeed`；改用专用工具 **`fillet_edges`** ✅ |
+| 倒角 | `CreateChamferBuilder` | ❌ | 同上；本机可靠路径 = 专用工具 **`chamfer_edges`** ✅（§15） |
+| 孔 | `CreateHoleFeatureBuilder` / `CreateHolePackageBuilder` | ⚠️ 仅 journal 路径 | **桥接路径一律用 `create_cylindrical_hole` ✅**（§15） |
 | 螺纹 | `CreateThreadBuilder` | 🟡 | |
 | 文字（3D 浮雕） | `CreateTextBuilder` | 🟡 | 可做立体字 |
 
@@ -584,3 +581,183 @@ chrome/edge/firefox 一律跳过）+ 优先 `title.startswith("NX")`（真 NX �
   拿到 `READY` 再建模/测试；若 `NOT_READY` 且 NX 没开，提示用户去开 NX（**不要**由我再 headless 起 NX，必死）。
 - 真机探针脚本：`probe_nx_api.py`（枚举全部工厂 + 在未保存临时零件里试特征）、`probe_move.py`（平移实测）、
   `analyze_nx_api.py` / `extract_members.py` / `extract_tm.py`（离线解析 `NXOpen.xml` 出能力矩阵与 API 签名）。
+- **2026-11-09 补齐**：`nx_env()` 现在同时注入 `NX_MCP_WORKSPACE` / `NX_MCP_TRANSPORT` /
+  `NX_MCP_HOST` / `NX_MCP_REMOTING_PORT` / `NX_MCP_PORT`，与 WorkBuddy 侧 `mcp.json` 完全一致
+  （详见 §16）。缺这些时 `create_part` / `export_exchange` 会落到默认 workspace 或失败。
+
+
+---
+
+# 以下为 2026-11-09 增补：与当前真实能力对齐
+
+> **本节优先级最高**：前面 §0–§14 是 2026-09 的历史配方库，凡与本节冲突之处，**一律以本节为准**。
+
+## 15. ⭐ 真机定稿：特征编辑 / 拓扑识别 / 工具选择
+
+来源：一次完整实操——删掉零件全部倒角 → 对「除最上面平面外所有边」倒角 → 在「没有斜向支撑的一侧」正中央开 5mm 圆形通孔（距边沿 5mm）。
+
+### 15.1 ✅ 可用（真机成功，直接照抄）
+
+| 操作 | 正确做法 |
+|---|---|
+| 删除倒角/倒圆特征 | `import NXOpen.UF` 显式导入后 `uf.Obj.DeleteObject(f.Tag)`；`f` 取自 `[f for f in work.Features.GetFeatures() if f.FeatureType in ('BLEND','CHAMFER')]`。实测 3 个 BLEND 一次删净，特征数 16→13、剩余 0 |
+| 批量倒角 | `mcp__siemens-nx__chamfer_edges(edge_indices=[...], distance=2.0, body_index=0, feature_name="CHAMFER_ALL")` → 一次 38 条边成功，返回 `CHAMFER(13)` |
+| 开圆孔 | `mcp__siemens-nx__create_cylindrical_hole(origin=[195,-50,6], diameter=5.0, depth=10.0, direction=[0,0,-1], target_body_index=0, feature_name="HOLE_5MM")` → 返回 `CYLINDER` |
+| 倒圆（同族） | `mcp__siemens-nx__fillet_edges(...)`，内部已适配 NX2007 |
+| 边/面/体拓扑 | `b.GetFaces()` / `b.GetEdges()` / `f.GetEdges()` / `e.GetVertices()` 全可用；`list(work.Bodies)` 是唯一可靠的体计数 |
+| 顶点坐标 | `e.GetVertices()` 返回 **Point3d**，直接 `.X/.Y/.Z`（**不是** `.Coordinates` / `.Point`） |
+| 改后验证 | `Counter(f.FeatureType for f in work.Features.GetFeatures())` + 面数/边数变化。实测倒角+开孔后：面 16→79、边 42→174，出现 `CHAMFER` + `CYLINDER` 各 1 |
+
+**铁律：倒角 / 倒圆 / 开孔一律用连接器专用工具，不要在 `run_python` 里手搓 builder。**
+
+### 15.2 ❌ 不可用（逐个实测，别再踩）
+
+- `work.Features.DeleteFeature([f])` —— FeatureCollection 上**不存在**（只有 `SuppressFeatures`）。删特征必须走 UF `Obj.DeleteObject(tag)`。
+- `run_python` + `CreateEdgeBlendBuilder` —— 工厂存在，但 **`AddChain` 不存在**；正确签名是 `AddChainset(collector, radius)`，而 collector 需要的 `EdgeMultipleSeed` / `CollectionManager` **在本绑定里完全不存在**（`NXOpen` 主模块、`NXOpen.Features` 子模块、Part 上都没有）。
+- `uf.Modl.BlendEdge(...)` —— 需 6 参，第 6 参是输出 `unsigned int` tag；本绑定没有 `NXOpen.Tag` 类型，UF 输出参数也拒收 Python 值 → 走不通。
+- `Face.GetSurface()` / `Face.AskFaceData()` —— 都不存在；`uf.Modl.AskFaceData(tag)` 对本机 **B‑曲面实体返回零法向 / 空包围盒** → **不能用面法向判断"哪个是顶面"**。
+- `mcp__siemens-nx__inspect_body_topology` —— 报 `0 bodies`，与进程内 `list(work.Bodies)` 不一致 → 判断体/边一律用 `run_python`。
+- `MCP/UG/diagnose.py` —— 用 HTTP GET 探测 .NET Remoting 端口会误报「桥未就绪」；**就绪判据只认 `nx_ready.py --status`**（TCP 48161 + 日志最近事件为 `Ready on`）。
+
+### 15.3 ⭐ 拓扑法定位（比目测截图可靠）
+
+法向取不到时，用「面的边顶点坐标」判定：
+
+```python
+def face_pts(f):
+    return [(v.X, v.Y, v.Z) for e in f.GetEdges() for v in e.GetVertices()]
+
+edges = list(b.GetEdges())
+zmax = max(v.Z for e in edges for v in e.GetVertices())
+top_face = next(f for f in b.GetFaces()
+                if (lambda ps: ps and max(p[2] for p in ps) - min(p[2] for p in ps) < 0.01
+                    and max(p[2] for p in ps) > zmax - 0.01)(face_pts(f)))
+top_tags = set(e.Tag for e in top_face.GetEdges())
+blend_idx = [i for i, e in enumerate(edges) if e.Tag not in top_tags]
+```
+
+- 实例：顶板 Z=6、X:0–200、Y:−100–0；顶面 4 条边索引 `[4, 8, 16, 25]` 排除，其余 **38 条**倒角。
+- 「没有斜向支撑的一侧」同法：统计各面顶点 X 范围 → 斜撑只落在 X:25–105，**X:120–200 端悬空**，即目标侧。
+- 孔位公式：孔心 = `(边沿 X − 5, Y 中值, 顶面 Z)`，`direction=[0,0,-1]`，`depth` 必须 > 板厚（6mm 板用 10mm）。
+- `edge_indices` / `body_index` 用的是**当次** `list(b.GetEdges())` 顺序；改完特征后索引会变 → 每次操作前重新取，别复用旧索引。
+
+## 16. ⭐ 连接器最终配置（保证下次可用）
+
+### 16.1 传输链路
+
+```
+WorkBuddy 连接器 siemens-nx
+  -> stdio 启动 MCP/UG/server.py (FastMCP("siemens-nx"))
+  -> nx_bridge_client.py（默认 remoting 传输）
+  -> NXRemoteClient.exe -> http://127.0.0.1:48161/NXOpenSession（.NET Remoting）
+  -> NX 进程内 NXMcPRemotingServer.dll -> NXOpen
+```
+
+- 端口 **48161 是 .NET Remoting（HTTP）**，不是裸 JSON 套接字；48160 是旧 TCP 备用。
+- `NX_MCP_WORKSPACE` 由 **NX 进程内** `nx_remote_ops.py` 读取 → 必须在 `nx_ready.py::nx_env()`（启动 NX 时）注入，光写在 `mcp.json` 里对 NX 侧**无效**。本机固定 `D:\三维建模结果`，启动脚本会自动建目录。
+- `mcp_server.py` 是旧 slim 入口（48160），**正确入口是 `server.py`**。
+- 改完 `mcp.json` **不会自动生效**：需在 WorkBuddy 连接器管理里对 `siemens-nx` 点一次「信任 / Trust」，必要时重启 WorkBuddy。
+
+### 16.2 连接器配置模板（本机最终版，2026-11-09；`<REPO>` / `<NXROOT>` 为占位符）
+
+```json
+{
+  "mcpServers": {
+    "siemens-nx": {
+      "command": "<REPO>\\MCP\\UG\\.venv\\Scripts\\python.exe",
+      "args": ["<REPO>\\MCP\\UG\\server.py"],
+      "cwd": "<REPO>\\MCP\\UG",
+      "env": {
+        "UGII_BASE_DIR": "<NXROOT>",
+        "UGII_USER_DIR": "<REPO>\\MCP\\UG\\nx_user",
+        "NX_MCP_TRANSPORT": "remoting",
+        "NX_MCP_HOST": "127.0.0.1",
+        "NX_MCP_PORT": "48160",
+        "NX_MCP_REMOTING_PORT": "48161",
+        "NX_MCP_TIMEOUT": "120",
+        "NX_MCP_ALLOW_EXECUTE": "1",
+        "NX_MCP_WORKSPACE": "D:\\三维建模结果",
+        "NX_MCP_CLIENT_EXE": "<REPO>\\MCP\\UG\\dotnet_bridge\\bin\\NXRemoteClient.exe",
+        "NX_MCP_REMOTE_OPS": "<REPO>\\MCP\\UG\\nx_remote_ops.py",
+        "NX_MCP_NXOPEN_DLL": "<NXROOT>\\NXBIN\\managed\\NXOpen.dll",
+        "PYTHONPATH": "<REPO>\\MCP\\UG",
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
+```
+
+`<REPO>` = `E:\workbuddy-成果\2026-09-15-12-10-47\CAD-Agent-Hub`；`<NXROOT>` = `E:\NX\Program Files\Siemens\NX2007`。
+
+关键补齐项（旧配置缺这些，正是"下次会出问题"的地方）：
+1. **`cwd`** —— 固定工作目录，避免相对路径解析飘。
+2. **`NX_MCP_CLIENT_EXE` / `NX_MCP_REMOTE_OPS` / `NX_MCP_NXOPEN_DLL`** —— 把三个依赖用绝对路径钉死（`remoting` 传输必须能找到 `NXOpen.dll`）。
+3. **`NX_MCP_WORKSPACE`** —— 与 `nx_ready.py::nx_env()` 保持一致；成果目录自动创建。
+4. **`PYTHONUTF8` / `PYTHONIOENCODING` / `PYTHONPATH`** —— 中文路径不乱码、模块能导入。
+5. 保留 `UGII_BASE_DIR` / `NX_MCP_TRANSPORT` / `NX_MCP_REMOTING_PORT` / `NX_MCP_ALLOW_EXECUTE=1`。
+
+### 16.3 自检（改配置后必跑，2026-11-09 全绿）
+
+```
+python <工作区>\nx_ready.py --status                      -> RESULT: READY
+mcp__siemens-nx__ping                                   -> ok:true, transport=dotnet-remoting
+```
+再加一段 Python：读 `mcp.json` 的 env → 逐个 `os.path.exists` 检查 7 个绝对路径 →
+用同一 env + cwd 实例化 `NXBridgeClient()`，确认 `client_exe / operations_path / nxopen_path`
+三者 `.exists()` 均为 True → 用 stdin=DEVNULL 启动 `server.py` 应无导入错误。
+
+## 17. 上游 GitHub `NX_MCP` 方法论（2026-11-09 套用）
+
+`Mrxiaoxiaobai/NX_MCP`（fork of `DreamEnding/NX_MCP`）＝ 上游参考标准，含官方
+`skills/nx-modeling/SKILL.md`、16 个定型工具、C# GUI 桥、真机验证证据与恢复契约，
+已克隆到 `E:\workbuddy-成果\2026-09-15-12-10-47\NX_MCP_ref`。本机部署是面向 **NX2007**
+适配的工作副本，**不要**用上游 `NxMcpGuiBridge.dll` 替换本机 `NXMcPRemotingServer.dll`。
+
+上游纪律（必须遵守）：
+- 先 `ping` / 状态确认桥连上；**不凭空发明工具、不假设实验性工具可用**。
+- 专用工具优先，其余用 `run_python`；NXOpen 单线程串行，**一次只发一个操作**。
+- **改前查询**、用工具返回的对象引用（不猜显示名）、保留当前零件身份。
+- **改后验证要做实**（体数 / 特征 / 包围盒）；没真执行就如实说「未能验证」。
+- **恢复契约**：撤销或失败回滚后丢弃所有缓存引用，重新查询拿新 ID；`execution_state="unknown"`
+  （超时/断开）**不要自动重放**；`NX_ROLLBACK_FAILED` → 停止一切写操作；绝不循环报错。
+- 保存/关闭只针对 **work part**，不是整棵装配树；不覆盖无关零件。
+
+## 18. 版本与同步记录
+
+| 版本 | 日期 | 变化 |
+|---|---|---|
+| 1.4.1 | 2026-09-18 | 586 行真机配方库：椭球、视角、色板、能力矩阵、STEP 洗白、截图脚本 |
+| 2.0.0 | 2026-11-09 | 融合上游 NX_MCP 方法论；取消每步截图（用户明确要求） |
+| 3.0.0 | 2026-11-09 | **合并 1.4.1 全文 + 2.0.0 方法论 + 本轮特征编辑定稿 + 最终连接器配置；统一"移动实体不可用""默认不截图"等历史矛盾结论** |
+
+| **3.1.0** | **2026-11-09** | **二次优化**：统一 Windows 路径、移除 §4.1/4.2 死代码、修正 §4.4 反向结论与能力矩阵孔行、新增 §19 三方对照与「绝不精简重写」纪律 |
+
+同步目标：`Mrxiaoxiaobai/CAD-Agent-Hub`（main）。同步文件：
+`skills/nx-mcp-bridge-modeling/SKILL.md`、`MCP/UG/workbuddy_scripts/nx_ready.py`、
+`MCP/UG/config/siemens-nx.mcp.json.example`、`CAPABILITIES.md`。
+
+
+---
+
+## 19. v3.1.0 二次优化：586 行原版 / 重建版 / 最终版 三方对照
+
+| | 线上 586 行原版 (v1.4.1) | 曾重建的精简版 (v2.0.0) | **当前最终版 (v3.1.0)** |
+|---|---|---|---|
+| 规模 | 586 行 / 36 KB | 143 行 / 约 10 KB | 762 行 / 49 KB |
+| 真机配方 | 完整（椭球、视角、色板、布尔坑、STEP 洗白、能力矩阵、截图脚本…） | **丢失约 443 行配方** | 原版 **534/586 行逐行保留（91.1%）**；删掉的 35 行全是真机不可用死代码，40 个关键配方关键词零丢失 |
+| 上游 NX_MCP 方法论 | 无 | 有 | 有（§17） |
+| 特征编辑定稿 | 无 | 无 | 有（§15 可用 / 不可用清单） |
+| 连接器最终配置 | 无 | 无 | 有（§16） |
+| 结论一致性 | 含「移动实体可用」「每步截图」等过时结论 | 部分 | **统一**：移动实体不可用、默认不截图、倒角 / 倒圆 / 开孔走专用工具 |
+| 死代码 | 有（两段不可用的 MoveBuilder 示例） | 无 | **已移除**（§4.1 / 4.2），只留结论 |
+| 路径写法 | 正确 | — | **统一 Windows 反斜杠**（修正 `D://` 混用） |
+
+> ⭐ **纪律（写进技能，别再犯）**：技能文件只能「在原版上增补 + 修正」，**绝不精简重写**。
+> 每次同步后跑一次逐行 diff：确认有效配方零丢失、逐行保留率 > 90%、
+> 无互相矛盾的结论残留、Windows 路径写法统一。
+
+本机生效技能、`github_sync` 副本、`CAD-Agent-Hub` 副本、`github_publish` 副本四处保持 md5 一致；
+逐行保留率 91.1% 的原因：删除 35 行死代码 + 14 处结论修正改写了原文；**有效配方 100% 保留**。
+线上同步目标 `Mrxiaoxiaobai/CAD-Agent-Hub`（main，基线 `275ee61`）。

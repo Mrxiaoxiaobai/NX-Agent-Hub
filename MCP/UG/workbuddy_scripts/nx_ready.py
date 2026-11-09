@@ -28,6 +28,9 @@ UGII = os.path.join(NXROOT, "UGII")
 NXBIN = os.path.join(NXROOT, "NXBIN")
 # 桥 DLL 部署在这里；NX 靠 UGII_USER_DIR\startup 自动调用它的 Startup()
 BRIDGE_ROOT = r"E:\workbuddy-成果\2026-09-15-12-10-47\CAD-Agent-Hub\MCP\UG\nx_user"
+# 成果 / workspace：create_part / export_exchange 等工具的文件落点由 NX 进程内的
+# NX_MCP_WORKSPACE 决定（nx_remote_ops.py 读的是 NX 进程环境变量，不是 MCP server 的）。
+WORKSPACE = r"D:\三维建模结果"
 TMP = os.environ.get("TEMP") or r"C:\Users\xajsxy\AppData\Local\Temp"
 LOG = os.path.join(TMP, "nx_mcp_remoting_server.log")
 HOST, PORT = "127.0.0.1", 48161
@@ -42,6 +45,17 @@ def nx_env():
     env["UGII_USER_DIR"] = BRIDGE_ROOT      # 缺这个桥就不会自动加载
     env["DISPLAY"] = "LOCALPC:0.0"
     env["PATH"] = NXBIN + os.pathsep + UGII + os.pathsep + env.get("PATH", "")
+    # 以下 5 项必须与 WorkBuddy 侧 mcp.json 的 siemens-nx 连接器保持一致，
+    # 否则 create_part / export_exchange / import_exchange 会落到默认 workspace 或失败。
+    env["NX_MCP_WORKSPACE"] = WORKSPACE
+    env["NX_MCP_TRANSPORT"] = "remoting"
+    env["NX_MCP_HOST"] = HOST
+    env["NX_MCP_REMOTING_PORT"] = str(PORT)
+    env["NX_MCP_PORT"] = "48160"
+    try:
+        os.makedirs(WORKSPACE, exist_ok=True)
+    except Exception:
+        pass
     return env
 
 

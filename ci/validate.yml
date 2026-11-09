@@ -1,0 +1,32 @@
+name: validate
+
+# 参照上游 NX_MCP 的 ci.yml，但只跑 L0 静态自检：
+# 本仓库的 L1 / L2 验收需要本机 Siemens NX2007 与 .NET Remoting 桥，
+# 托管 runner 无法提供，因此故意不在这里跑（见 docs/validation.md）。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Repo consistency (L0)
+        run: python scripts/validate_repo.py
+
+      - name: Unit tests (L0)
+        run: python -m unittest discover -s tests -v

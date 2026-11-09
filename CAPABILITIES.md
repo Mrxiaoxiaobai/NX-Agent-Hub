@@ -1,6 +1,9 @@
 # CAD-Agent-Hub · NX 建模能力清单
 
-> 最后真机核验：**2026-11-09** ｜ 技能 `nx-mcp-bridge-modeling` **v3.1.0** ｜ 桥 **v0.20.1** ｜ **Siemens NX 2007**
+> 最后真机核验：**2026-11-09** ｜ 技能 `nx-mcp-bridge-modeling` **v3.2.0** ｜ 桥 **v0.20.1** ｜ **Siemens NX 2007**
+>
+> v3.2.0 是**工程规范层升级**（文档、验收、自检、CI），未改动任何已真机验证的建模代码；
+> §3 / §4 的 ✅ / ❌ 结论全部沿用 2026-11-09 真机记录。
 >
 > 本文件是「仓库内容 = 本机真实能力」的对照表。能力有变化时，同步更新本文件与
 > `skills/nx-mcp-bridge-modeling/SKILL.md`，避免文档停留在旧结论。
@@ -92,6 +95,14 @@ WorkBuddy 连接器 siemens-nx
 | `MCP/UG/workbuddy_scripts/nx_shot3.py` | 工作区根目录 `nx_shot3.py`（**按需**截图，非默认） |
 | `MCP/UG/config/siemens-nx.mcp.json.example` | `~/.workbuddy/mcp.json` 的模板 |
 | `CAPABILITIES.md` | 本文件，能力对照表 |
+| `CHANGELOG.md` | 版本变更记录（v1.4.1 → v3.2.0） |
+| `AGENTS.md` | 给 AI 与维护者的仓库约定，对应上游 `CLAUDE.md` |
+| `CONTRIBUTING.md` / `SECURITY.md` | 改动纪律 / 本地回环与令牌边界 |
+| `docs/architecture.md` | 本机真实链路 + 对象与操作生命周期 + 恢复契约 |
+| `docs/validation.md` | L0 / L1 / L2 分层验收与证据分级 |
+| `docs/inspection-contract.md` | 查询契约：可靠手段、已实测不可靠手段、明确不做的提案 |
+| `docs/nx-mcp-comparison.md` | 与上游 `NX_MCP` 的定位对照、借鉴边界与不可互换原因 |
+| `scripts/validate_repo.py` + `tests/` + `.github/workflows/validate.yml` | 零依赖静态自检、unittest 包装与无需 NX 的 CI |
 
 上游参考：`Mrxiaoxiaobai/NX_MCP`（fork of `DreamEnding/NX_MCP`）—— 官方建模方法论来源；
 本机部署是面向 NX2007 适配的工作副本，**不要**用上游 C# GUI 桥替换本机 `NXMcPRemotingServer.dll`。
@@ -107,6 +118,35 @@ WorkBuddy 连接器 siemens-nx
 5. **新增 §19 三方对照表 + 纪律**：技能只能「原版上增补 + 修正」，绝不精简重写；同步后必跑逐行 diff（保留率 > 95%）。
 
 校验结果：586 行原版 **534/586 行逐行保留（91.1%，删掉的 35 行是死代码）**、40 个关键配方关键词零丢失、四处技能副本 md5 一致。
+
+## 6.2 v3.2.0 参照上游 `NX_MCP` 的工程规范对齐（2026-11-09）
+
+**只补规范，不改能力**：82 个专用工具、`run_python`、桥 DLL、连接器配置一行未动；
+本文件 §3 / §4 的真机结论全部沿用。补齐的是「仓库能不能自证与本机的真实能力一致」：
+
+| 上游 `NX_MCP` | 本仓库落地 |
+|---|---|
+| `CLAUDE.md` / `CONTRIBUTING.md` / `SECURITY.md` | `AGENTS.md` / 同名轻量版（按 NX2007 回环边界重写） |
+| `CHANGELOG.md` / `RELEASE.md` | `CHANGELOG.md` + `docs/validation.md` 分层验收 |
+| `docs/architecture.md`（对象生命周期 / 恢复契约） | 同名文档，改写为本机链路与「无 undo mark」的恢复方式 |
+| `docs/inspection-contract.md` | 同名文档，改为「已验证查询契约 + 已知不可靠项 + 明确不做的提案」 |
+| `docs/real-nx-validation.md`（证据分级） | `docs/validation.md`：**文档声明 ≠ CI 通过 ≠ 工具 ok ≠ 真机正确** |
+| `tests/` + `ci.yml` | `scripts/validate_repo.py` + `tests/` + 零 NX 依赖的 `validate.yml` |
+
+新增静态自检（L0，可在任何机器跑，不需要 NX）：
+
+```
+python scripts/validate_repo.py            # 关键文件 / 四处技能副本 md5 / 版本号 / 模板 / 链接 / 无令牌
+python -m unittest discover -s tests -v   # 同一套检查的 unittest 包装
+```
+
+L1（桥连通）与 L2（真机建模）**只能在这台 NX2007 机器上跑**，CI 故意不跑。
+技能新增 §20，把上游「改前查询 → 对象引用 → 改后验证 → 失败恢复」四步契约
+映射到本机具体工具；两库为何不能互换见 `docs/nx-mcp-comparison.md`。
+
+> 刻意没借鉴：上游 16 个定型 `nx_*` 工具、34 个 legacy 工具、`nx_measure_*` 提案、
+> 20 轮 batch / GUI 重启 / self-hosted runner / 发布门禁、C# GUI 桥与签名流程。
+> 本机工具面已够用，且那些验收需要 NX2506 / NX2206 与专用 runner。
 
 ## 7. 交付约定
 
